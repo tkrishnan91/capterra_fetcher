@@ -4,6 +4,9 @@ const fs = require('fs')
 const url = "https://www.capterra.com/gdm_reviews?full_list=true&product_id=80432&sort_options=Most%20Recent"
 const testFile = "./gdm_reviews.htm"
 const content = fs.readFileSync(testFile,'utf8');
+
+
+exports.handler = (event, context, callback) => {
 //console.log("content: " + content)
 // request.get(url,{"timeout": 1500},function(error,response, body){
 //   if(!error){
@@ -72,5 +75,6 @@ request(options,function(error,response, body){
         console.log(error)
       }
 })
+}
 
 
