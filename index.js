@@ -96,9 +96,10 @@ if (hash != hashurl) {
     })
     console.log(reviewsArrayjson)
     
-    
   //function {slack_webhook}
     const slackwebhookpayload = {Name: reviewsArrayjson[0].reviewerName, NPS: reviewsArrayjson[0].rating, Reviews_To_Date:reviewsArrayjson.length,}
+    var newparams = {reviewsArrayjson}
+    var newparams = JSON.stringify(newparams)
     console.log(slackwebhookpayload)
 
     const slackwebhook = process.env.SLACK_WEBHOOK
@@ -121,7 +122,6 @@ if (hash != hashurl) {
       
     }
   }
-
   request(options,function(error,response, body){
       if(!error){
   //console.log("works",response) 
@@ -131,8 +131,32 @@ if (hash != hashurl) {
         }
   });
 
-} else {
+} else {//
   console.log ("No review changes in Capterra")
 }
+
+  //function {s3_reviewer_details} 
+  //configuring parameters
+
+  var nameparams = {
+    Bucket: 'reviewerdetails',
+    Body : newparams,
+    Key : "reviewerdetails"
+  };
+
+  // Create object upload
+  s3.upload(nameparams, function (err, data) {
+    //handle error
+    if (err) {
+      console.log("Error", err);
+    }
+    //success
+    if (data) {
+      console.log("Uploaded in:", data.Location);
+    }
+  });
+
+
+
 
 }
