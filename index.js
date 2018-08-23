@@ -15,148 +15,133 @@ const url = "https://www.capterra.com/gdm_reviews?full_list=true&product_id=8043
 //compare hashes
 //post message and update s3 //function -done
 
+//Functions
 function scrapeSite(url) {
-request.get(url, { "timeout": 1500 }, function (error, response, body) {
-  if (!error) {
-    const $ = cheerio.load(body)
-    const reviews = $('div.reviews-list').toArray()
-    return reviews
-
-  } else {
-    return (error)
-  }
-})
+  // Make get request to Capterra
+  request.get(url, { "timeout": 10000 }, function (error, response, body) {
+    if (!error) {
+      const $ = cheerio.load(body)
+      const reviews = $('div.reviews-list').toArray()
+      return reviews
+    } else {
+      return (error)
+    }
+  })
 }
-
- // Hash url and store in S3 bucket
-  const hashreviews = sha1(reviews);
-  console.log (hashreviews);
-
-//update first hash to AWS
-
-//configuring the AWS environment
-  AWS.config.update({
-      accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
-      secretAccessKey: "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"
-    });
-    var s3 = new AWS.S3();
-  //configuring parameters
-  var params = {
-    Bucket: 'capterrabucket',
-    Body : hashreviews,
-    Key : "hashfile"
-  };
-  // Create object upload
-  s3.upload(params, function (err, data) {
-    //handle error
-    if (err) {
-      console.log("Error", err);
-    }
-    //success
-    if (data) {
-      console.log("Uploaded in:", data.Location);
-    }
-  });
-
-  function retrieveHashFromS3(bucket,key){
-  //configuring the AWS environment
+function s3Upload(s3PayLoad) {
+  //Configure AWS environment
   AWS.config.update({
     accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
     secretAccessKey: "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"
   });
   var s3 = new AWS.S3();
-  //construct getParam to get hashurl value
+  //Configure parameters and upload file
+  var params = {
+    Bucket: 'capterrabucket',
+    Body: s3InformationUpload,
+    Key: "hashfile"
+  };
+  s3.upload(params, function (err, data) {
+    if (err) {
+      console.log("Error", err);
+    }
+    if (data) {
+      console.log("Uploaded in:", data.Location);
+    }
+  });
+}
+function getLatestReviewerDetails(reviews) {
+  const $ = cheerio.load(reviews)
+  const reviewsArray = $('div.cell-review').children().toArray()
+  console.log("Number of reviews: " + reviewsArray.length)
+  // Create Review Detail Array with Name and Rating
+  const reviewsArrayjson = reviewsArray.map((review) => {
+    var review = cheerio.load(review)
+    let reviewDetails = review('.reviewer-details').first().children()
+    let reviewerName = reviewDetails.first().text()
+    console.log("Name: " + reviewerName)
+    //gauge-wrapper" data-rating="6.0"
+    let guageWrapper = review('[data-rating]')
+    let rating = "NONE"
+    if (guageWrapper.attr('data-rating')) {
+      rating = guageWrapper.attr('data-rating')
+      console.log("NPS Score: " + guageWrapper.attr('data-rating'))
+    }
+    return { reviewerName: reviewerName, rating: rating }
+  })
+  // Capture Reviews to Date
+  reviewsArrayjson[0].reviewsToDate = reviewsArrayjson.length
+  return reviewsArrayjson[0]
+}
+function retrieveHashFromS3(callback) {
+  let lasthash;
+  //Reconfigure AWS environment
+  AWS.config.update({
+    accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
+    secretAccessKey: "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"
+  });
+  var s3 = new AWS.S3();
+  //Reconstruct parameters to get hashurl value
   var params = {
     Bucket: 'capterrabucket',
     Key: "hashfile"
   }
-  //Fetch or read data from aws s3
-  s3.getObject(params, function (err, data) {
+  //Read Hash Value from S3
+  s3.getObject(params, (err, data) => {
     if (err) {
-        console.log(err.stack);
+      console.log(err.stack);
     } else {
-        var lasthash = data.Body.toString()
-        console.log("Hash Value:"+ lasthash);
-        return lasthash
+      var lasthash = data.Body.toString()
+      console.log("Hash Value:" + lasthash);
+      callback(lasthash)
     }
   })
-  }
-
-  if (lasthash = hashreviews) {
-    console.log ("No review changes in Capterra")
-  }
-    else {
-
-    function store_reviewer_details(){
-    const $ = cheerio.load(content)
-    const reviewsArray = $('div.cell-review').children().toArray()
-    console.log("Number of reviews: " + reviewsArray.length)
-    const reviewsArrayjson = reviewsArray.map((review) => {
-      var review = cheerio.load(review)
-      let reviewDetails = review('.reviewer-details').first().children()
-      let reviewerName = reviewDetails.first().text()
-      console.log("Name: " + reviewerName)
-      //gauge-wrapper" data-rating="6.0"
-      let guageWrapper = review('[data-rating]')
-      let rating = "NONE"
-        if (guageWrapper.attr('data-rating')) {
-        rating = guageWrapper.attr('data-rating')
-            console.log("NPS Score: "+guageWrapper.attr('data-rating'))
+}
+function createSlackNotification(reviewerName, rating, reviewsToDate) {
+  // Create slackwebhook enivronmental variable
+  const slackwebhook = process.env.SLACK_WEBHOOK
+  // Slack Attachment
+  var options = {
+    uri: slackwebhook,
+    method: 'POST',
+    json: {
+      "attachments": [
+        {
+          "fallback": "Required plain-text summary of the attachment.",
+          "color": "#2C3849",
+          "pretext": "Attention PSM Team",
+          "title": "New Review",
+          "title_link": "https://www.capterra.com/p/80432/Jama/",
+          "text": "from " + reviewerName + " \n" + "NPS score: " + rating + " \n" + reviewsToDate + " Reviews to Date"
         }
-      return  {reviewerName: reviewerName,rating: rating}
-    })
-    console.log(reviewsArrayjson)
+      ]
+    }
+  }
+  return options
+}
+function compareHash(reviews, hashreviews, lasthash) {
   
-  function slack_webhook(newparams){
-    const slackwebhookpayload = {Name: reviewsArrayjson[0].reviewerName, NPS: reviewsArrayjson[0].rating, Reviews_To_Date:reviewsArrayjson.length,}
-    var newparams = {reviewsArrayjson}
-    var newparams = JSON.stringify(newparams)
-    return slackwebhookpayload
-    const slackwebhook = process.env.SLACK_WEBHOOK
-    var options = {
-        uri: slackwebhook,
-        method: 'POST',
-        json: {
-          "attachments": [
-            {
-                "fallback": "Required plain-text summary of the attachment.",
-                "color": "#2C3849",
-                "pretext": "Attention PSM Team",
-                "title": "New Review",
-                "title_link": "https://www.capterra.com/p/80432/Jama/",
-                "text":  "from " + slackwebhookpayload.Name + " \n" + "NPS score: " + slackwebhookpayload.rating + " \n" + slackwebhookpayload.Reviews_To_Date + " Reviews to Date"
-            }      
-    ] 
-    }
-    }
+  if (lasthash != hashreviews) {
+    console.log("No review changes in Capterra")
   }
+  // If hash values have changed call createSlackNotification and update AWS S3 with reviewer details 
+  else {
+    console.log("reviews in compare hash" + reviews)
+    var reviewsArrayjson = getLatestReviewerDetails(reviews)
+    const slackPayLoad = createSlackNotification(reviewsArrayjson.reviewerName, reviewsArrayjson.rating, reviewsArrayjson.reviewsToDate)
+    request.post(slackPayLoad)
+    s3InformationUpload = {
+      'hash': hashreviews,
+      'reviewerName': reviewsArrayjson.reviewerName,
+      'rating': reviewsArrayjson.rating
+    }
+    s3Upload(s3PayLoad)
 
-  function update_s3_reviewer_details(bucket,body,key){
-    //configuring the AWS environment
-    AWS.config.update({
-      accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
-      secretAccessKey: "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"
-    });
-    var s3 = new AWS.S3();
-    //configuring parameters
-      var nameparams = {
-        Bucket: 'reviewerdetails',
-        Body : newparams,
-        Key : "reviewerdetails"
-        };
-        
-        // Create object upload
-        s3.upload(nameparams, function (err, data) {
-        //handle error
-        if (err) {
-          return ("Error", err);
-        }
-        //success
-        if (data) {
-          return data.Location;
-        }
-        });
-    }
-    }
   }
-//}
+}
+
+const reviews = scrapeSite(url)
+const hashreviews = sha1(reviews);
+console.log(hashreviews);
+console.log("reviews out" +reviews)
+retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
