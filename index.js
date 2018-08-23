@@ -16,15 +16,15 @@ const content = fs.readFileSync(testFile,'utf8');
 //post message and update s3 //function -done
 
 //Functions
-function scrapeSite(url) {
+function scrapeSite(url, callback) {
   // Make get request to Capterra
-  request.get(url, { "timeout": 10000 }, function (error, response, body) {
+  return request.get(url, { "timeout": 10000 }, function (error, response, body) {
     if (!error) {
       const $ = cheerio.load(body)
       const reviews = $('div.reviews-list').toArray()
-      return reviews
+      return callback(reviews)
     } else {
-      return (error)
+      return error
     }
   })
 }
@@ -50,6 +50,7 @@ function s3Upload(s3Load) {
     }
   });
 }
+
 function getLatestReviewerDetails(reviews) {
   const $ = cheerio.load(reviews)
   const reviewsArray = $('div.cell-review').children().toArray()
@@ -73,6 +74,7 @@ function getLatestReviewerDetails(reviews) {
   reviewsArrayjson[0].reviewsToDate = reviewsArrayjson.length
   return reviewsArrayjson[0]
 }
+
 function retrieveHashFromS3(callback) {
   let lasthash;
   //Reconfigure AWS environment
@@ -137,8 +139,11 @@ function compareHash(reviews, hashreviews, lasthash) {
     s3Upload(s3Load)
   }
 }
-const reviews = scrapeSite(url)
-const hashreviews = sha1(reviews);
-console.log(hashreviews);
-console.log("reviews out" +reviews)
-retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
+scrapeSite(url, (reviews) => {
+  const test = getLatestReviewerDetails(reviews);
+  const hashreviews = sha1(test);
+  console.log(hashreviews);
+  console.log("reviews out" +reviews)
+
+  retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
+});
