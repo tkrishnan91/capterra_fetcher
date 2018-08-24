@@ -16,13 +16,13 @@ const url = "https://www.capterra.com/gdm_reviews?full_list=true&product_id=8043
 //post message and update s3 //function -done
 
 //Functions
-function scrapeSite(url) {
+function scrapeSite(url,callback) {
   // Make get request to Capterra
   request.get(url, { "timeout": 10000 }, function (error, response, body) {
     if (!error) {
       const $ = cheerio.load(body)
       const reviews = $('div.reviews-list').toArray()
-      return reviews
+      return callback(reviews)
     } else {
       return (error)
     }
@@ -120,7 +120,6 @@ function createSlackNotification(reviewerName, rating, reviewsToDate) {
   return options
 }
 function compareHash(reviews, hashreviews, lasthash) {
-  
   if (lasthash != hashreviews) {
     console.log("No review changes in Capterra")
   }
@@ -128,20 +127,21 @@ function compareHash(reviews, hashreviews, lasthash) {
   else {
     console.log("reviews in compare hash" + reviews)
     var reviewsArrayjson = getLatestReviewerDetails(reviews)
-    const slackPayLoad = createSlackNotification(reviewsArrayjson.reviewerName, reviewsArrayjson.rating, reviewsArrayjson.reviewsToDate)
+    const slackLoad = createSlackNotification(reviewsArrayjson.reviewerName, reviewsArrayjson.rating, reviewsArrayjson.reviewsToDate)
     request.post(slackPayLoad)
-    s3InformationUpload = {
+    s3Load = {
       'hash': hashreviews,
       'reviewerName': reviewsArrayjson.reviewerName,
       'rating': reviewsArrayjson.rating
     }
-    s3Upload(s3PayLoad)
-
+    s3Upload(s3Load)
   }
 }
 
-const reviews = scrapeSite(url)
-const hashreviews = sha1(reviews);
-console.log(hashreviews);
-console.log("reviews out" +reviews)
-retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
+scrapeSite(url, (reviews) => {
+  const process_entries = getLatestReviewerDetails(reviews); //Get URL and Process Entries for hash review
+  const hashreviews = sha1(process_entries);
+  console.log(hashreviews);
+  console.log("reviews out" + reviews)
+  retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
+});
