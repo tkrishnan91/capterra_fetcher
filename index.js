@@ -16,41 +16,18 @@ const content = fs.readFileSync(testFile,'utf8');
 //post message and update s3 //function -done
 
 //Functions
-function scrapeSite(url, callback) {
+function scrapeSite(url,callback) {
   // Make get request to Capterra
-  return request.get(url, { "timeout": 10000 }, function (error, response, body) {
+  request.get(url, { "timeout": 10000 }, function (error, response, body) {
     if (!error) {
       const $ = cheerio.load(body)
       const reviews = $('div.reviews-list').toArray()
       return callback(reviews)
     } else {
-      return error
+      return (error)
     }
   })
 }
-function s3Upload(s3Load) {
-  //Configure AWS environment
-  AWS.config.update({
-    accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
-    secretAccessKey: "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"
-  });
-  var s3 = new AWS.S3();
-  //Configure parameters and upload file
-  var params = {
-    Bucket: 'capterrabucket',
-    Body: s3Load,
-    Key: "hashfile"
-  };
-  s3.upload(params, function (err, data) {
-    if (err) {
-      console.log("Error", err);
-    }
-    if (data) {
-      console.log("Uploaded in:", data.Location);
-    }
-  });
-}
-
 function getLatestReviewerDetails(reviews) {
   const $ = cheerio.load(reviews)
   const reviewsArray = $('div.cell-review').children().toArray()
@@ -74,7 +51,28 @@ function getLatestReviewerDetails(reviews) {
   reviewsArrayjson[0].reviewsToDate = reviewsArrayjson.length
   return reviewsArrayjson[0]
 }
-
+function s3Upload(s3Load) {
+  //Configure AWS environment
+  AWS.config.update({
+    accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
+    secretAccessKey: "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"
+  });
+  var s3 = new AWS.S3();
+  //Configure parameters and upload file
+  var params = {
+    Bucket: 'capterrabucket',
+    Body: s3Load,
+    Key: "hashfile"
+  };
+  s3.upload(params, function (err, data) {
+    if (err) {
+      console.log("Error", err);
+    }
+    if (data) {
+      console.log("Uploaded in:", data.Location);
+    }
+  });
+}
 function retrieveHashFromS3(callback) {
   let lasthash;
   //Reconfigure AWS environment
@@ -139,11 +137,11 @@ function compareHash(reviews, hashreviews, lasthash) {
     s3Upload(s3Load)
   }
 }
-scrapeSite(url, (reviews) => {
-  const test = getLatestReviewerDetails(reviews);
-  const hashreviews = sha1(test);
-  console.log(hashreviews);
-  console.log("reviews out" +reviews)
 
+scrapeSite(url, (reviews) => {
+  const process_entries = getLatestReviewerDetails(reviews); //Get URL and Process Entries for hash review
+  const hashreviews = sha1(process_entries);
+  console.log(hashreviews);
+  console.log("reviews out" + reviews)
   retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
 });
