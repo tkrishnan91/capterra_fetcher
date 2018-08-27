@@ -9,10 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.293.0",
+    "anything": "^1.0.0",
+    "aws-sdk": "^2.295.0",
     "cheerio": "^1.0.0-rc.2",
     "file-system": "^2.2.2",
     "fs": "0.0.1-security",
+    "hash": "^0.2.1",
+    "hash-anything": "^1.1.2",
     "request": "^2.88.0"
   }
 }
