@@ -32,8 +32,8 @@ function scrapeSite(url, callback) {
 function s3Upload(s3Load) {
   //Configure AWS environment
   AWS.config.update({
-    accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
-    secretAccessKey: "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"
+    accessKeyId: process.env.AWSAccessKeyId,
+    secretAccessKey: process.env.AWSSecretKey
   });
   var s3 = new AWS.S3();
   //Configure parameters and upload file
@@ -79,8 +79,8 @@ function getLatestReviewerDetails(reviews) {
 function retrieveHashFromS3(callback) {
   //Reconfigure AWS environment
   AWS.config.update({
-    accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
-    secretAccessKey: "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"
+    accessKeyId: process.env.AWSAccessKeyId ,
+    secretAccessKey: process.env.AWSSecretKey
   });
   var s3 = new AWS.S3();
   //Reconstruct parameters to get hashurl value
@@ -138,10 +138,11 @@ function compareHash(latestReview, hashOfLatestReview, hashFromS3) {
     s3Upload(s3Load)
   }
 }
+// Calling AWS Lambda Function exports.handler = (event, context, callback) => {
 scrapeSite(url, (reviews) => {
   const latestReview = getLatestReviewerDetails(reviews); //Get URL and Process Entries for hash review
   const hashOfLatestReview = sha1(latestReview);
   console.log("Hash of latest review: " + hashOfLatestReview);
-  console.log("Latest Review: " + latestReview)
   retrieveHashFromS3((hashFromS3) => compareHash(latestReview, hashOfLatestReview, hashFromS3))
 });
+//};
