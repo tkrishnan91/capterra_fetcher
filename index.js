@@ -39,7 +39,7 @@ function s3Upload(s3Load) {
   //Configure parameters and upload file
   var params = {
     Bucket: 'capterrabucket',
-    Body: s3Load,
+    Body: JSON.stringify(s3Load),
     Key: "hashfile"
   };
   s3.upload(params, function (err, data) {
@@ -77,7 +77,6 @@ function getLatestReviewerDetails(reviews) {
 }
 
 function retrieveHashFromS3(callback) {
-  let lasthash;
   //Reconfigure AWS environment
   AWS.config.update({
     accessKeyId: "AKIAISSU3Z6KEJYJVUHA",
@@ -94,9 +93,10 @@ function retrieveHashFromS3(callback) {
     if (err) {
       console.log(err.stack);
     } else {
-      var lasthash = data.Body.toString()
-      console.log("Hash Value:" + lasthash);
-      callback(lasthash)
+      var s3Output = data.Body.toString()
+      var hashFromS3 = JSON.parse(s3Output).hash
+      console.log("Hash Value from S3:" + hashFromS3);
+      callback(hashFromS3)
     }
   })
 }
@@ -122,28 +122,26 @@ function createSlackNotification(reviewerName, rating, reviewsToDate) {
   }
   return options
 }
-function compareHash(reviews, hashreviews, lasthash) {
-  if (lasthash != hashreviews) {
+function compareHash(latestReview, hashOfLatestReview, hashFromS3) {
+  if (hashOfLatestReview === hashFromS3) {
     console.log("No review changes in Capterra")
   }
   // If hash values have changed call createSlackNotification and update AWS S3 with reviewer details 
   else {
-    console.log("reviews in compare hash" + reviews)
-    var reviewsArrayjson = getLatestReviewerDetails(reviews)
-    const slackLoad = createSlackNotification(reviewsArrayjson.reviewerName, reviewsArrayjson.rating, reviewsArrayjson.reviewsToDate)
+    const slackPayLoad = createSlackNotification(latestReview.reviewerName, latestReview.rating, latestReview.reviewsToDate)
     request.post(slackPayLoad)
     s3Load = {
-      'hash': hashreviews,
-      'reviewerName': reviewsArrayjson.reviewerName,
-      'rating': reviewsArrayjson.rating
+      'hash': hashOfLatestReview,
+      'reviewerName': latestReview.reviewerName,
+      'rating': latestReview.rating
     }
     s3Upload(s3Load)
   }
 }
 scrapeSite(url, (reviews) => {
-  const process_entries = getLatestReviewerDetails(reviews); //Get URL and Process Entries for hash review
-  const hashreviews = sha1(process_entries);
-  console.log(hashreviews);
-  console.log("reviews out" + reviews)
-  retrieveHashFromS3((lasthash) => compareHash(reviews, hashreviews, lasthash))
+  const latestReview = getLatestReviewerDetails(reviews); //Get URL and Process Entries for hash review
+  const hashOfLatestReview = sha1(latestReview);
+  console.log("Hash of latest review: " + hashOfLatestReview);
+  console.log("Latest Review: " + latestReview)
+  retrieveHashFromS3((hashFromS3) => compareHash(latestReview, hashOfLatestReview, hashFromS3))
 });
