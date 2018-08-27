@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "anything": "^1.0.0",
-    "aws-sdk": "^2.295.0",
+    "aws-sdk": "^2.302.0",
     "cheerio": "^1.0.0-rc.2",
     "file-system": "^2.2.2",
     "fs": "0.0.1-security",
